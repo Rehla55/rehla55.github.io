@@ -1,7 +1,6 @@
 # Local worker & Secrets
 local.rules.json
 serviceAccountKey.json
-# firebase_worker.py is now public (logic only)
 answers_key.py
 
 # Temp & Logs
@@ -15,3 +14,7 @@ full_questions.json
 full_answers.json
 questions.json
 answers.json
+
+#extra data
+.gitignore
+__pycache__/

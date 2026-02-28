@@ -182,31 +182,47 @@
 
     window.logout = function() { firebase.auth().signOut(); };
 
-    window.signInWithGoogle = function() {
-        const provider = new firebase.auth.GoogleAuthProvider();
-        firebase.auth().signInWithPopup(provider)
-            .then((result) => {
-                const user = result.user;
-                db.ref('users/' + user.uid).once('value').then(snap => {
-                    if (!snap.exists()) {
-                        const userName = user.displayName || user.email.split('@')[0];
-                        db.ref('users/' + user.uid).set({
-                            name: userName,
-                            email: user.email,
-                            score: 0,
-                            solvedDays: "",
-                            role: 'user',
-                            lastAnsweredDay: 0
-                        }).then(() => {
-                            db.ref('leaderboard/' + user.uid).set({ name: userName, score: 0 });
-                        });
-                    }
+    window.signInWithGoogle = function(response) {
+        // If response is present, it's from the new GSI library (ID Token)
+        if (response && response.credential) {
+            const credential = firebase.auth.GoogleAuthProvider.credential(response.credential);
+            firebase.auth().signInWithCredential(credential)
+                .then((result) => {
+                    handleUserPostLogin(result.user);
+                }).catch((error) => {
+                    console.error("GSI Error:", error);
+                    showToast("خطأ في تسجيل الدخول: " + error.message, "error");
                 });
-            }).catch((error) => {
-                console.error("Google Sign-In Error:", error);
-                showToast("خطأ في تسجيل الدخول: " + error.message, "error");
-            });
+        } else {
+            // Fallback for direct calls (if any) or old popup method
+            const provider = new firebase.auth.GoogleAuthProvider();
+            firebase.auth().signInWithPopup(provider)
+                .then((result) => {
+                    handleUserPostLogin(result.user);
+                }).catch((error) => {
+                    console.error("Popup Error:", error);
+                    showToast("خطأ في تسجيل الدخول: " + error.message, "error");
+                });
+        }
     };
+
+    function handleUserPostLogin(user) {
+        db.ref('users/' + user.uid).once('value').then(snap => {
+            if (!snap.exists()) {
+                const userName = user.displayName || user.email.split('@')[0];
+                db.ref('users/' + user.uid).set({
+                    name: userName,
+                    email: user.email,
+                    score: 0,
+                    solvedDays: "",
+                    role: 'user',
+                    lastAnsweredDay: 0
+                }).then(() => {
+                    db.ref('leaderboard/' + user.uid).set({ name: userName, score: 0 });
+                });
+            }
+        });
+    }
 
     firebase.auth().onAuthStateChanged(user => {
         if (user) {
