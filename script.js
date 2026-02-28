@@ -609,6 +609,14 @@
         if(hint) hint.style.display = (isLenOk && isCapOk && isNumOk) ? "none" : "block";
     };
 
+    window.toggleGoogleBtn = function(isChecked) {
+        const btn = document.getElementById('googleRegisterContainer');
+        if (btn) {
+            btn.style.opacity = isChecked ? "1" : "0.5";
+            btn.style.pointerEvents = isChecked ? "auto" : "none";
+        }
+    };
+
     window.shareApp = function() {
         const link = window.location.href;
         if (navigator.share) {

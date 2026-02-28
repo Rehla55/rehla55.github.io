@@ -127,12 +127,12 @@
             </div>
             <div
                 style="display: flex; align-items: center; justify-content: center; margin-top: 15px; font-size: 0.9rem;">
-                <input type="checkbox" id="agreeToPolicy" style="width: auto; margin-left: 10px;">
+                <input type="checkbox" id="agreeToPolicy" style="width: auto; margin-left: 10px;" onchange="toggleGoogleBtn(this.checked)">
                 <label for="agreeToPolicy">أوافق على <a href="#" onclick="showPage('policyPage'); return false;"
                         style="color: var(--gold);">شروط الاستخدام والسياسات</a></label>
             </div>
             <button id="regBtn" onclick="register()">Start Journey</button>
-            <div class="google-btn-container">
+            <div id="googleRegisterContainer" class="google-btn-container" style="opacity: 0.5; pointer-events: none; transition: opacity 0.3s;">
                 <div class="g_id_signin"
                      data-type="standard"
                      data-shape="pill"
