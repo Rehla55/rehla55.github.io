@@ -572,7 +572,7 @@
     };
 
     function startTimer(day) {
-        let timeLeft = 10;
+        let timeLeft = 30;
         clearInterval(timerInterval);
         const timerDisplay = document.getElementById('timerDisplay');
         timerInterval = setInterval(() => {

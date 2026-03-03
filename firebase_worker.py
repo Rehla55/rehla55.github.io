@@ -105,7 +105,7 @@ def process_single_submission(uid, data):
         else:
             delta_ms = timestamp_ms - quiz_start_time
             # 10s allowed + 2s buffer for network = 12s
-            if delta_ms > 12000:
+            if delta_ms > 32000:
                 print(f"[{CHECKER_ID}] ⏳ TIMER EXPIRED: User {uid} took {delta_ms/1000:.1f}s. Auto-failing.")
                 final_choice = -1
 
