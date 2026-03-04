@@ -1,5 +1,4 @@
 # Local worker & Secrets
-local.rules.json
 serviceAccountKey.json
 answers_key.py
 
@@ -15,6 +14,6 @@ full_answers.json
 questions.json
 answers.json
 
-#extra data
+# Extra data
 .gitignore
 __pycache__/

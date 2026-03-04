@@ -16,6 +16,23 @@
     }
     const db = firebase.database();
 
+    // --- UI Utility: Policy Modal ---
+    window.overlayIn = function() {
+        const modal = document.getElementById('policyModal');
+        if (modal) {
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+    };
+
+    window.overlayOut = function() {
+        const modal = document.getElementById('policyModal');
+        if (modal) {
+            modal.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+    };
+
     // --- UI Utility: Toast Notifications ---
     window.showToast = function(message, type = 'info') {
         const container = document.getElementById('toastContainer');
