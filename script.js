@@ -679,3 +679,12 @@
     loadLeaderboard();
 })();
 navigator.serviceWorker.register('firebase-messaging-sw.js') // شلنا الـ / اللي في الأول
+messaging.getToken({ 
+    vapidKey: 'BJ8-ysECAGjQlPqjoRD9YPekOszOOOskrnOgNHU-BnPqMpHqrzUJn9VUKlMUJBJumd5kzr-za6yaLh2G5J_Qwtg' 
+}).then((currentToken) => {
+    if (currentToken) {
+        console.log("Token:", currentToken);
+    }
+}).catch((err) => {
+    console.log("Error:", err);
+});
