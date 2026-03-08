@@ -500,7 +500,8 @@
             
             db.ref('users/' + uid).once('value').then(uSnap => {
                 const userData = uSnap.val() || { score: 0, solvedDays: "", lastAnsweredDay: 0 };
-                document.getElementById('userScore').textContent = userData.score || 0;
+                const userScoreEl = document.getElementById('userScore');
+                if (userScoreEl) userScoreEl.textContent = userData.score || 0;
                 const headerScore = document.getElementById('headerScore');
                 if (headerScore) headerScore.textContent = (userData.score || 0) + " نقطة";
                 
