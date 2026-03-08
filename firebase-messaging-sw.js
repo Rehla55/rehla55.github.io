@@ -3,7 +3,7 @@ importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compa
 
 // املأ البيانات دي من الفايربيز عندك (Config)
 firebase.initializeApp({
-  apiKey: "AIzaSyDsFEgVfoEVaf6AME5OV6nwTjMaHM63A5U"
+  apiKey: "AIzaSyDsFEgVfoEVaf6AME5OV6nwTjMaHM63A5U",
   projectId: "rehla55day-e8bf2",
   storageBucket: "rehla55day-e8bf2.firebasestorage.app",
   messagingSenderId: "39933750061", // هتلاقي الرقم ده في إعدادات الفايربيز
@@ -21,3 +21,4 @@ messaging.onBackgroundMessage((payload) => {
   };
   self.registration.showNotification(notificationTitle, notificationOptions);
 });
+
