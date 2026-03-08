@@ -267,7 +267,7 @@
                 showPage('homePage');
                 loadDailyContent(user.uid);
                 const nameDisplay = document.getElementById('userNameDisplay');
-                if (nameDisplay) nameDisplay.textContent = "مرحباً: " + (user.displayName || "صديقي");
+                if (nameDisplay) nameDisplay.textContent = (user.displayName || "صديقي");
 
                 if (userData.role === 'admin') {
                     const adminBtn = document.getElementById('adminBtn');
@@ -684,6 +684,11 @@
             if (user) {
                 firebase.database().ref('users/' + user.uid + '/fcmToken').set(currentToken);
                 window.showToast("تم تفعيل التنبيهات بنجاح!", "success");
+                const icon = document.getElementById('notificationIcon');
+                if(icon) {
+                    icon.classList.add('filled');
+                    icon.style.color = '#d4af37';
+                }
             }
         } else {
             console.log('No registration token available.');
@@ -694,7 +699,52 @@
     }); // Close navigator.serviceWorker.register
 };
 
-    // --- Google Sign-In Handler (Global) ---
+// --- Notification Toggle Logic ---
+window.toggleNotifications = function() {
+    const icon = document.getElementById('notificationIcon');
+    if (!firebase.apps.length) return;
+
+    // Check if we are "subscribed" based on icon state or permission
+    // For a robust check, we should see if we have a token, but for UI toggling:
+    
+    if (Notification.permission === 'granted' && icon.classList.contains('filled')) {
+        // User wants to DISABLE
+        // We can't really "revoke" browser permission via JS, but we can remove the token from DB
+        const user = firebase.auth().currentUser;
+        if (user) {
+            firebase.database().ref('users/' + user.uid + '/fcmToken').remove()
+            .then(() => {
+                window.showToast("تم إيقاف التنبيهات.", "info");
+                icon.classList.remove('filled');
+                icon.style.color = '#fff'; // Revert to white/default
+            });
+        }
+    } else {
+        // User wants to ENABLE (or re-enable)
+        // Call the original request logic
+        window.requestNotificationPermission();
+        // UI is updated in requestNotificationPermission on success
+    }
+};
+
+// Update updateNotificationIcon to be called on load
+function updateNotificationUI() {
+    const icon = document.getElementById('notificationIcon');
+    if (!icon) return;
+    
+    if (Notification.permission === 'granted') {
+        // Ideally check if token exists in DB, but for now assume granted = enabled
+        icon.classList.add('filled');
+        icon.style.color = '#d4af37'; // Gold for active
+    } else {
+        icon.classList.remove('filled');
+        icon.style.color = '#fff'; // White for inactive
+    }
+}
+// Call this on load
+updateNotificationUI();
+
+// --- Google Sign-In Handler (Global) ---
     window.signInWithGoogle = function(response) {
     // If response is present, it's from the new GSI library (ID Token)
     if (response && response.credential) {
