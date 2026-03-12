@@ -1,6 +1,7 @@
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import db
+from firebase_admin import messaging
 import time
 import os
 import socket
@@ -23,6 +24,25 @@ try:
 except Exception as e:
     print(f"❌ Initialization Error: {e}")
     exit()
+
+def send_push_notification(token, title, body):
+    """Send a push notification to a specific FCM token."""
+    if not token:
+        return False
+    try:
+        message = messaging.Message(
+            notification=messaging.Notification(
+                title=title,
+                body=body,
+            ),
+            token=token,
+        )
+        response = messaging.send(message)
+        print(f"✅ Push notification sent: {response}")
+        return True
+    except Exception as e:
+        print(f"❌ Failed to send push notification: {e}")
+        return False
 
 def get_current_journey_day(custom_time=None):
     """Calculates the journey day based on Cairo time (UTC+2).
@@ -146,6 +166,24 @@ def process_single_submission(uid, data):
             })
             db.reference(f'submissions/{uid}').delete()
             print(f"✅ [{CHECKER_ID}] DONE: {uid} | {status_capture['result'].upper()} (+{status_capture['points']} pts)")
+            
+            # Send push notification to user
+            try:
+                user_snapshot = db.reference(f'users/{uid}').get()
+                print(f"🔔 Checking for FCM token for user {uid}: {user_snapshot}")
+                if user_snapshot and user_snapshot.get('fcmToken'):
+                    fcm_token = user_snapshot['fcmToken']
+                    print(f"📱 Sending push to token: {fcm_token[:20]}...")
+                    result_text = "إجابة صحيحة! +10 نقاط" if status_capture['result'] == 'correct' else "إجابة خاطئة! +5 نقاط"
+                    send_push_notification(
+                        fcm_token,
+                        f"نتيجة اليوم {submitted_day}",
+                        result_text
+                    )
+                else:
+                    print(f"⚠️ No FCM token found for user {uid}")
+            except Exception as e:
+                print(f"⚠️ [{CHECKER_ID}] Failed to send notification: {e}")
             
         elif reason == "ALREADY_PROCESSED":
             print(f"⏭️  [{CHECKER_ID}] IGNORED: {uid} was already processed by another device.")

@@ -1,7 +1,42 @@
+const CACHE_NAME = 'rehla55-v1';
+const urlsToCache = [
+  './',
+  './index.html',
+  './manifest.json',
+  './img/icon.jpeg',
+  './img/SiteImage.png'
+];
+
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(urlsToCache))
+  );
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(keys => {
+      return Promise.all(
+        keys.filter(key => key !== CACHE_NAME)
+            .map(key => caches.delete(key))
+      );
+    })
+  );
+  self.clients.claim();
+});
+
+self.addEventListener('fetch', event => {
+  event.respondWith(
+    caches.match(event.request)
+      .then(response => response || fetch(event.request))
+  );
+});
+
+// --- Firebase Messaging ---
 importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js');
-
-console.log('Firebase Messaging Service Worker loading...');
 
 firebase.initializeApp({
   apiKey: "AIzaSyDsFEgVfoEVaf6AME5OV6nwTjMaHM63A5U",
@@ -13,10 +48,7 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-console.log('Firebase Messaging initialized');
-
 messaging.onBackgroundMessage((payload) => {
-  console.log('Background message received:', payload);
   const notificationTitle = payload.notification ? payload.notification.title : 'إشعار جديد';
   const notificationOptions = {
     body: payload.notification ? payload.notification.body : '',
@@ -24,5 +56,3 @@ messaging.onBackgroundMessage((payload) => {
   };
   self.registration.showNotification(notificationTitle, notificationOptions);
 });
-
-console.log('Background message handler registered');
