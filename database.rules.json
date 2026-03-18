@@ -19,6 +19,9 @@
         },
         "lastAnsweredDay": {
           ".validate": "root.child('users').child(auth.uid).child('role').val() === 'admin' || (newData.isNumber() && (!data.exists() || newData.val() == data.val()))"
+        },
+        "photoURL": {
+          ".validate": "newData.isString() && newData.val().startsWith('https://firebasestorage.googleapis.com')"
         }
       }
     },

@@ -1,5 +1,5 @@
 (function() {
-    // Version: 2.0.4 - Wait List & iPhone Notice
+    // Version: 2.0.3 - UI Toasts & Alert Removal
     const firebaseConfig = {
         apiKey: "AIzaSyDsFEgVfoEVaf6AME5OV6nwTjMaHM63A5U",
         authDomain: "rehla55day-e8bf2.firebaseapp.com",
@@ -15,79 +15,6 @@
         firebase.initializeApp(firebaseConfig);
     }
     const db = firebase.database();
-
-    // --- CONNECTION MULTIPLEXING V5 ---
-    const DB_LOG = true;
-    let offlineTimeout = null;
-    db._goOnline = db.goOnline;
-    db._goOffline = db.goOffline;
-    
-    db.goOnline = function(reason = "General") {
-        if (offlineTimeout) { clearTimeout(offlineTimeout); offlineTimeout = null; }
-        if (DB_LOG) console.log(`%c[DB] 🟢 Online: ${reason}`, "color: #00ff00; font-weight: bold;");
-        db._goOnline();
-    };
-    
-    db.goOffline = function(reason = "Release", delay = 0) {
-        if (offlineTimeout) clearTimeout(offlineTimeout);
-        if (delay > 0) {
-            if (DB_LOG) console.log(`[DB] ⏳ Offline scheduled in ${delay}ms: ${reason}`);
-            offlineTimeout = setTimeout(() => {
-                if (DB_LOG) console.log(`%c[DB] 🔴 Offline: ${reason}`, "color: #ff4444;");
-                db._goOffline();
-                offlineTimeout = null;
-            }, delay);
-        } else {
-            if (DB_LOG) console.log(`%c[DB] 🔴 Offline: ${reason}`, "color: #ff4444;");
-            db._goOffline();
-        }
-    };
-
-    let isConnected = false;
-    db.ref('.info/connected').on('value', (snap) => {
-        isConnected = snap.val() === true;
-        if (DB_LOG) console.log(`[DB] Socket State: ${isConnected ? 'CONNECTED' : 'DISCONNECTED'}`);
-    });
-
-    async function ensureConnected(timeout = 5000) {
-        if (isConnected) return true;
-        db.goOnline("Ensure Connection");
-        return new Promise((resolve) => {
-            const start = Date.now();
-            const interval = setInterval(() => {
-                if (isConnected) { clearInterval(interval); resolve(true); }
-                else if (Date.now() - start > timeout) { clearInterval(interval); resolve(false); }
-            }, 100);
-        });
-    }
-
-    // --- Wait List System (Simple) ---
-    let isLoading = false;
-    
-    window.showWaitListScreen = function() {
-        const modal = document.getElementById('waitListModal');
-        if (modal && !isLoading) {
-            modal.style.display = 'flex';
-            isLoading = true;
-            let seconds = 3;
-            const countdown = document.getElementById('waitCountdown');
-            const interval = setInterval(() => {
-                if (!isLoading) { clearInterval(interval); return; }
-                if (countdown) countdown.textContent = '...';
-                seconds--;
-                if (seconds <= 0) {
-                    clearInterval(interval);
-                    window.hideWaitListScreen();
-                }
-            }, 1000);
-        }
-    };
-
-    window.hideWaitListScreen = function() {
-        const modal = document.getElementById('waitListModal');
-        if (modal) modal.style.display = 'none';
-        isLoading = false;
-    };
 
     // --- UI Utility: Policy Modal ---
     window.overlayIn = function() {
@@ -314,11 +241,7 @@
             .catch(e => showToast(e.message, "error"));
     };
 
-    window.logout = function() { 
-        firebase.auth().signOut().then(() => {
-            location.reload();
-        });
-    };
+    window.logout = function() { firebase.auth().signOut(); };
 
     window.finalizePolicyAgreement = function() {
         const checkbox = document.getElementById('googleAgreePolicy');
@@ -329,16 +252,17 @@
         const user = firebase.auth().currentUser;
         if (!user) return showPage('loginPage');
 
-        db.goOnline("Policy Finalize");
         const userRef = db.ref('users/' + user.uid);
         userRef.once('value').then(snap => {
             const userName = user.displayName || user.email.split('@')[0];
             if (snap.exists()) {
+                // SAFE: Existing user just adding the agreement flag
                 return userRef.update({
                     agreedToPolicy: true,
                     agreedTime: firebase.database.ServerValue.TIMESTAMP
                 });
             } else {
+                // New user: Full profile initialization
                 return userRef.set({
                     name: userName,
                     email: user.email,
@@ -354,52 +278,41 @@
             }
         }).then(() => {
             showToast("تم تحديث الحساب بنجاح!", "success");
-            db.goOffline("Policy Done", 1000);
-            location.reload();
+            showPage('homePage');
+            loadDailyContent(user.uid);
         }).catch(e => {
             console.error("Signup Finalization Error:", e);
             showToast("حدث خطأ أثناء إعداد الحساب.", "error");
-            db.goOffline("Policy Fail");
         });
     };
 
-    firebase.auth().onAuthStateChanged(async user => {
+    firebase.auth().onAuthStateChanged(user => {
         if (user) {
-            // Check 1: Email Verification
+            // User is signed in.
+            // Check 1: Is email verified? (Skip for Google users)
             if (!user.emailVerified && user.providerData.some(p => p.providerId === 'password')) {
                 showPage('verifyEmailPage');
-                return;
+                return; // Stop further execution until verified
             }
 
-            db.goOnline("Auth State Initial");
-            const ready = await ensureConnected();
-            if (!ready) {
-                window.showWaitListScreen();
-                return;
-            }
-
-            // Check 2: User Status
-            db.ref('users/' + user.uid).once('value').then(async snap => {
+            // Check 2: User Status (Banned or Policy Agreement)
+            db.ref('users/' + user.uid).once('value').then(snap => {
                 const userData = snap.val();
                 
                 if (userData && userData.role === 'banned') {
                     firebase.auth().signOut();
                     showPage('bannedPage');
-                    db.goOffline("User Banned");
                     return;
                 }
 
                 if (!userData || userData.agreedToPolicy !== true) {
                     showPage('completeProfilePage');
-                    db.goOffline("Profile Needed", 3000);
                     return;
                 }
 
-                // Wait for content load BEFORE showing page
-                await loadDailyContent(user.uid);
-                
+                // If verified, not banned, and agreed to policy:
                 showPage('homePage');
-                
+                loadDailyContent(user.uid);
                 const nameDisplay = document.getElementById('userNameDisplay');
                 if (nameDisplay) nameDisplay.textContent = (user.displayName || "صديقي");
                 
@@ -414,36 +327,28 @@
                 if (userData.name) {
                     db.ref('leaderboard/' + user.uid + '/name').set(userData.name).catch(() => {});
                 }
-
-                if (!window.dayTimerStarted) {
-                    setInterval(updateDayCountdown, 1000);
-                    window.dayTimerStarted = true;
-                }
-                
-                // Release connection after everything is ready
-                db.goOffline("Initial Load Done", 5000);
             });
+
+            if (!window.dayTimerStarted) {
+                setInterval(updateDayCountdown, 1000);
+                window.dayTimerStarted = true;
+            }
         } else {
+            // User is signed out.
             showPage('loginPage');
             if (window.dayTimerStarted) window.dayTimerStarted = false;
-            db.goOffline("Logged Out", 1000);
         }
-        loadLeaderboard();
+        renderLeaderboard();
     });
 
     let leaderboardData = [];
     let isLeaderboardListenerAttached = false;
 
-    window.loadLeaderboard = async function(isManual = false) {
-        if (isManual) window.showToast("جاري تحديث القائمة...", "info");
-        
-        db.goOnline("Leaderboard Load");
-        const ready = await ensureConnected();
-        if (!ready) return;
-
-        try {
-            const query = db.ref('leaderboard').orderByChild('score').limitToLast(50);
-            const snapshot = await query.once('value');
+    function loadLeaderboard() {
+        if (isLeaderboardListenerAttached) return;
+        isLeaderboardListenerAttached = true;
+        const query = db.ref('leaderboard').orderByChild('score');
+        query.on('value', (snapshot) => {
             const temp = [];
             snapshot.forEach(child => {
                 const val = child.val();
@@ -452,11 +357,7 @@
             temp.sort((a, b) => b.score - a.score);
             leaderboardData = temp;
             renderLeaderboard();
-            db.goOffline("Leaderboard Done", 3000);
-        } catch (e) {
-            console.error("Leaderboard Error:", e);
-            db.goOffline("Leaderboard Fail");
-        }
+        });
     }
 
     function renderLeaderboard() {
@@ -501,9 +402,8 @@
     }
 
     function syncAllUsersToLeaderboard() {
-        db.goOnline("Admin Sync");
         return db.ref('users').once('value').then(snapshot => {
-            if (!snapshot.exists()) { db.goOffline("Sync Done (No Data)"); return; }
+            if (!snapshot.exists()) return;
             const updates = {};
             snapshot.forEach(child => {
                 const userData = child.val();
@@ -514,10 +414,9 @@
                     };
                 }
             });
-            return db.ref().update(updates).then(() => db.goOffline("Sync Success"));
+            return db.ref().update(updates);
         }).catch(e => {
             if (e.code !== 'PERMISSION_DENIED') console.error("Sync error:", e);
-            db.goOffline("Sync Error");
         });
     }
 
@@ -525,15 +424,9 @@
         showPage('adminPage');
         const usersListDiv = document.getElementById('usersList');
         usersListDiv.innerHTML = "<p style='text-align:center; color:white;'>⏳ جاري تحميل قائمة الأبطال...</p>";
-        
-        db.goOnline("Admin Panel Load");
         db.ref('users').once('value').then(snapshot => {
             usersListDiv.innerHTML = ""; 
-            if (!snapshot.exists()) { 
-                usersListDiv.innerHTML = "<p style='text-align:center;'>لا يوجد مستخدمين حالياً.</p>"; 
-                db.goOffline("Admin Load Empty");
-                return; 
-            }
+            if (!snapshot.exists()) { usersListDiv.innerHTML = "<p style='text-align:center;'>لا يوجد مستخدمين حالياً.</p>"; return; }
             snapshot.forEach(childSnapshot => {
                 const userId = childSnapshot.key; const userData = childSnapshot.val();
                 if (!userData) return; // Skip if user data is null
@@ -584,8 +477,7 @@
                 userRow.appendChild(controlsDiv);
                 usersListDiv.appendChild(userRow);
             });
-            db.goOffline("Admin Load Complete");
-        }).catch(() => db.goOffline("Admin Load Fail"));
+        });
     };
 
     window.toggleBan = function(userId, isBanned) {
@@ -637,59 +529,62 @@
     }
 
     function loadDailyContent(uid) {
-        return new Promise((resolve, reject) => {
         const day = getCurrentJourneyDay();
         db.ref('questions/' + day).once('value').then(qSnap => {
             const data = qSnap.val();
             const quizArea = document.getElementById('quizArea');
-            if (!data) {
-                if (quizArea) quizArea.innerHTML = "<p style='color:white;'>جاري تحميل السؤال...</p>";
-                resolve(); return;
-            }
-
+            if (!data) return quizArea.innerHTML = "<p style='color:white;'>جاري تحميل السؤال...</p>";
+            
             renderSundaySpecial(day);
-            const dailyMsg = document.getElementById('dailyMsg');
-            if (dailyMsg) dailyMsg.textContent = spiritualMessages[day - 1] || "";
-            const dailyExp = document.getElementById('dailyExp');
-            if (dailyExp) dailyExp.textContent = spiritualExplanations[day - 1] || "";
             const questionText = document.getElementById('questionText');
             if (questionText) questionText.textContent = data.q;
-
+            
             const now = new Date();
             const cairoNow = new Date(now.toLocaleString('en-US', { timeZone: 'Africa/Cairo' }));
             const currentSunday = (cairoNow.getDay() === 0) ? "اليوم: " + (sundayNames[Math.floor((day - 1) / 7)] || "أحد مبارك") : "اليوم " + day + " من الرحلة";
             const sundayTag = document.getElementById('sundayTag');
             if (sundayTag) sundayTag.textContent = currentSunday;
-
+            
             db.ref('users/' + uid).once('value').then(uSnap => {
                 const userData = uSnap.val() || { score: 0, solvedDays: "", lastAnsweredDay: 0 };
                 const userScoreEl = document.getElementById('userScore');
                 if (userScoreEl) userScoreEl.textContent = userData.score || 0;
                 const headerScore = document.getElementById('headerScore');
                 if (headerScore) headerScore.textContent = (userData.score || 0) + " نقطة";
-
+                
                 if (userData.lastAnsweredDay >= day) {
                     clearInterval(timerInterval);
                     const isCorrect = (userData.solvedDays || "").includes("," + day + ":correct,");
-                    quizArea.innerHTML = `<div style="padding:20px;margin-top:20px; border:2px solid ${isCorrect?'#00ff00':'#ff4444'}; border-radius:15px; background:rgba(0,0,0,0.3); color:${isCorrect?'#00ff00':'#ff4444'}; text-align:center;">
-                        <h3>${isCorrect?'✅ أحسنت! إجابتك صحيحة':'📍 حظاً موفقاً غداً'}</h3>
-                        <p style="color:white; font-size:0.95rem;">${data.e}</p>
-                    </div>`;
-                    resolve();
+                    const dailyFrame = document.getElementById('dailyFrame');
+                    if (dailyFrame) {
+                        dailyFrame.style.display = 'block';
+                        dailyFrame.innerHTML = `
+                            <div style="padding:20px; border:2px solid ${isCorrect?'#00ff00':'#ff4444'}; border-radius:15px; background:rgba(0,0,0,0.3); text-align:center;">
+                                <h4 style="color:var(--gold); margin:0 0 10px 0;">✨ هذه الرسالة</h4>
+                                <p class="daily-text" style="margin:0 0 15px 0;">${spiritualMessages[day - 1] || ""}</p>
+                                <h4 style="color:#00ffcc; margin:0 0 10px 0;">📖 هذا التفسير</h4>
+                                <p style="color:white; font-size:0.95rem; margin:0 0 15px 0;">${spiritualExplanations[day - 1] || ""}</p>
+                                <h4 style="color:#d4af37; margin:15px 0 10px 0; border-top:1px solid #444; padding-top:15px;">💡 شرح الإجابة</h4>
+                                <p style="color:#ddd; font-size:0.95rem; margin:0 0 15px 0; line-height:1.7;">${data.e}</p>
+                                <h3 style="margin:15px 0 0 0; color:${isCorrect?'#00ff00':'#ff4444'};">${isCorrect?'✅ أحسنت! إجابتك صحيحة':'📍 حظاً موفقاً غداً'}</h3>
+                            </div>
+                        `;
+                    }
+                    quizArea.innerHTML = '';
                 } else {
                     // Check if there's a pending submission for THIS day
                     db.ref('submissions/' + uid).once('value').then(subSnap => {
                         const subData = subSnap.val();
                         if (subData && subData.day === day) {
                             clearInterval(timerInterval);
-                            quizArea.innerHTML = `<div style="padding:20px; margin-top: 20px; border:2px solid var(--gold); border-radius:15px; background:rgba(0,0,0,0.3); color:var(--gold); text-align:center;">
+                            quizArea.innerHTML = `<div style="padding:20px; border:2px solid var(--gold); border-radius:15px; background:rgba(0,0,0,0.3); color:var(--gold); text-align:center;">
                                 <h3>⏳ جاري مراجعة إجابتك...</h3>
                                 <p style="color:white; font-size:0.95rem;">مدقق الإجابات يقوم بمعالجة طلبك الآن، يرجى عدم إغلاق الصفحة.</p>
                             </div>`;
                             db.ref('submissions/' + uid).on('value', (s) => { if (!s.exists()) location.reload(); });
-                            resolve(); // Resolve even if listener is active
                         } else {
-                            // Check if user has clicked "Start"
+                            const dailyFrame = document.getElementById('dailyFrame');
+                            if (dailyFrame) dailyFrame.style.display = 'none';
                             if (userData.read_status === true && userData.read_day === day) {
                                 document.getElementById('startQuizContainer').style.display = 'none';
                                 document.getElementById('quizContent').style.display = 'block';
@@ -699,38 +594,26 @@
                                 document.getElementById('startQuizContainer').style.display = 'block';
                                 document.getElementById('quizContent').style.display = 'none';
                             }
-                            resolve();
                         }
-                    }).catch(resolve);
+                    });
                 }
-            }).catch(resolve);
-        }).catch(resolve);
+            });
         });
     }
 
-    window.startQuiz = async function() {
+    window.startQuiz = function() {
         const user = firebase.auth().currentUser;
         if (!user) return;
         const day = getCurrentJourneyDay();
         
-        db.goOnline("Quiz Start");
-        const ready = await ensureConnected();
-        if (!ready) {
-            window.showWaitListScreen();
-            return;
-        }
-
         db.ref('users/' + user.uid).update({
             read_status: true,
             read_day: day,
             quiz_start_time: firebase.database.ServerValue.TIMESTAMP
         }).then(() => {
-            // Stay online for the 30s quiz duration
-            if (DB_LOG) console.log("[DB] ⚡ Quiz Session Started. Slot reserved.");
-            location.reload(); 
+            loadDailyContent(user.uid);
         }).catch(e => {
             showToast("حدث خطأ أثناء بدء المسابقة، يرجى المحاولة لاحقاً.", "error");
-            db.goOffline("Quiz Start Fail");
         });
     };
 
@@ -764,13 +647,12 @@
         clearInterval(timerInterval);
         const quizArea = document.getElementById('quizArea');
         if (quizArea) {
-            quizArea.innerHTML = `<div style="padding:20px; margin-top:20px; border:2px solid var(--gold); border-radius:15px; background:rgba(0,0,0,0.3); color:var(--gold); text-align:center;">
+            quizArea.innerHTML = `<div style="padding:20px; border:2px solid var(--gold); border-radius:15px; background:rgba(0,0,0,0.3); color:var(--gold); text-align:center;">
                 <h3>⏳ جاري إرسال إجابتك...</h3>
                 <p style="color:white; font-size:0.95rem;">يرجى الانتظار بينما يتواصل التطبيق مع مدقق الإجابات.</p>
             </div>`;
         }
         
-        await ensureConnected();
         const submissionRef = db.ref('submissions/' + uid);
         
         try {
@@ -780,27 +662,20 @@
                 timestamp: firebase.database.ServerValue.TIMESTAMP
             });
             
-            // Listen for submission removal (processed by worker)
-            const subListener = submissionRef.on('value', (snap) => {
+            if (quizArea) {
+                quizArea.innerHTML = `<div style="padding:20px; border:2px solid var(--gold); border-radius:15px; background:rgba(0,0,0,0.3); color:var(--gold); text-align:center;">
+                    <h3>⏳ جاري مراجعة إجابتك...</h3>
+                    <p style="color:white; font-size:0.95rem;">مدقق الإجابات يقوم بمعالجة طلبك الآن، يرجى عدم إغلاق الصفحة.</p>
+                </div>`;
+            }
+            
+            submissionRef.on('value', (snap) => {
                 if (!snap.exists()) {
-                    submissionRef.off('value', subListener);
-                    db.goOffline("Submission Complete");
                     location.reload();
                 }
             });
-
-            // Safety timeout
-            setTimeout(() => {
-                submissionRef.off('value', subListener);
-                db.goOffline("Worker Timeout");
-                if (document.getElementById('quizArea').innerHTML.includes('إرسال')) {
-                    location.reload();
-                }
-            }, 15000);
-
         } catch (e) {
-            showToast("عذراً! هناك خطأ في الاتصال.", "error");
-            db.goOffline("Submission Fail");
+            showToast("عذراً! لقد استهلكت فرصتك لليوم أو هناك خطأ في الاتصال.", "error");
             location.reload();
         }
     }
@@ -855,7 +730,7 @@
 
     window.showQRCode = function() {
         closeShareModal();
-        const DuoModal = document.getElementById('qrModal');
+        const qrModal = document.getElementById('qrModal');
         const qrContainer = document.getElementById('qrcode');
         qrContainer.innerHTML = '';
         
@@ -866,8 +741,8 @@
             qrContainer.innerHTML = '<p style="color:#aaa;">حدث خطأ في تحميل رمز QR</p>';
         }
         
-        if (DuoModal) {
-            DuoModal.classList.add('active');
+        if (qrModal) {
+            qrModal.classList.add('active');
             document.body.style.overflow = 'hidden';
         }
     };
@@ -886,109 +761,164 @@
     };
 
     loadLeaderboard();
-
-    // --- iPhone Google Login Notice ---
-    window.isIphone = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-    
-    window.showIphoneGoogleModal = function() {
-        if (window.isIphone) {
-            const modal = document.getElementById('iphoneGoogleModal');
-            if (modal) {
-                modal.style.display = 'flex';
-                document.body.style.overflow = 'hidden';
-            }
-            return true;
-        }
-        return false;
-    };
-
-    window.closeIphoneGoogleModal = function() {
-        const modal = document.getElementById('iphoneGoogleModal');
-        if (modal) {
-            modal.style.display = 'none';
-            document.body.style.overflow = '';
-        }
-    };
-
     })();
 
-    // --- Global Functions (Outside IIFE) ---
+    // --- Global Functions (Outside IIFE to ensure visibility) ---
     window.requestNotificationPermission = function() {
-    if (!firebase.apps.length) return;
+    // We need to access 'messaging' and 'db' from inside the closure. 
+    // Since we can't easily break the closure without refactoring everything, 
+    // we will re-initialize messaging here strictly for this permission request.
+    // This is a robust fallback pattern.
+
+    if (!firebase.apps.length) return; // Should already be initialized
 
     let messaging;
     try {
-        if (firebase.messaging.isSupported()) messaging = firebase.messaging();
-    } catch (e) { return; }
+        if (firebase.messaging.isSupported()) {
+            messaging = firebase.messaging();
+        }
+    } catch (e) {
+        window.showToast("التنبيهات غير مدعومة في هذا المتصفح.", "error");
+        return;
+    }
 
-    if (!messaging) return;
+    if (!messaging) return window.showToast("التنبيهات غير مدعومة.", "error");
 
+    // Register Service Worker (combined PWA + Firebase messaging)
     navigator.serviceWorker.register('sw.js')
     .then((registration) => {
+        console.log('Service Worker registered:', registration);
         Notification.requestPermission().then((permission) => {
             if (permission === 'granted') {
+                console.log('Notification permission granted.');
+                // Pass the registration to getToken
                 return messaging.getToken({ 
                     vapidKey: 'BJ8-ysECAGjQlPqjoRD9YPek0szOO0skrn0gNHU-BnPqMpHqrzUJn9VUKlMUJBJumd5kzr-za6yaLh2G5J_Qwtg',
                     serviceWorkerRegistration: registration 
                 }); 
+            } else {
+                window.showToast("تم رفض إذن التنبيهات.", "error");
+                console.log('Notification permission denied');
             }
         }).then((currentToken) => {
         if (currentToken) {
+            console.log('FCM Token:', currentToken);
             const user = firebase.auth().currentUser;
             if (user) {
-                const db = firebase.database();
-                db.goOnline("Notification Token Save");
-                db.ref('users/' + user.uid + '/fcmToken').set(currentToken).then(() => {
+                firebase.database().ref('users/' + user.uid + '/fcmToken').set(currentToken)
+                .then(() => {
                     window.showToast("تم تفعيل التنبيهات بنجاح!", "success");
-                    db.goOffline("Notification Done", 1000);
                     const icon = document.getElementById('notificationIcon');
-                    if(icon) { icon.classList.add('filled'); icon.style.color = '#d4af37'; }
+                    if(icon) {
+                        icon.classList.add('filled');
+                        icon.style.color = '#d4af37';
+                    }
                 });
             }
+        } else {
+            console.log('No registration token available.');
+            window.showToast("فشل في الحصول على التوكن.", "error");
         }
+    }).catch((err) => {
+        console.error('Notification error:', err);
     });
-    });
+    }).catch((swErr) => {
+        console.error('Service Worker registration failed:', swErr);
+        window.showToast("فشل في تسجيل Service Worker.", "error");
+    }); // Close navigator.serviceWorker.register
 };
 
+// --- Foreground Message Listener ---
+if (firebase.messaging.isSupported()) {
+    const messaging = firebase.messaging();
+    messaging.onMessage((payload) => {
+        console.log('Message received in foreground:', payload);
+        const notificationTitle = payload.notification.title || 'إشعار جديد';
+        const notificationOptions = {
+            body: payload.notification.body || '',
+            icon: 'img/icon.jpeg'
+        };
+        if (Notification.permission === 'granted') {
+            new Notification(notificationTitle, notificationOptions);
+        }
+    });
+}
+
+// --- Notification Toggle Logic ---
 window.toggleNotifications = function() {
     const icon = document.getElementById('notificationIcon');
-    if (!icon || !firebase.apps.length) return;
+    if (!firebase.apps.length) return;
 
+    // Check if we are "subscribed" based on icon state or permission
+    // For a robust check, we should see if we have a token, but for UI toggling:
+    
     if (Notification.permission === 'granted' && icon.classList.contains('filled')) {
+        // User wants to DISABLE
+        // We can't really "revoke" browser permission via JS, but we can remove the token from DB
         const user = firebase.auth().currentUser;
         if (user) {
-            const db = firebase.database();
-            db.goOnline("Notification Disable");
-            db.ref('users/' + user.uid + '/fcmToken').remove()
+            firebase.database().ref('users/' + user.uid + '/fcmToken').remove()
             .then(() => {
                 window.showToast("تم إيقاف التنبيهات.", "info");
                 icon.classList.remove('filled');
-                icon.style.color = '#fff';
-                db.goOffline("Notification Disabled", 1000);
+                icon.style.color = '#fff'; // Revert to white/default
             });
         }
     } else {
+        // User wants to ENABLE (or re-enable)
+        // Call the original request logic
         window.requestNotificationPermission();
+        // UI is updated in requestNotificationPermission on success
     }
 };
 
-window.signInWithGoogle = function(response) {
-    if (window.isIphone && window.showIphoneGoogleModal()) return;
+// Update updateNotificationIcon to be called on load
+function updateNotificationUI() {
+    const icon = document.getElementById('notificationIcon');
+    if (!icon) return;
+    
+    if (Notification.permission === 'granted') {
+        // Ideally check if token exists in DB, but for now assume granted = enabled
+        icon.classList.add('filled');
+        icon.style.color = '#d4af37'; // Gold for active
+    } else {
+        icon.classList.remove('filled');
+        icon.style.color = '#fff'; // White for inactive
+    }
+}
+// Call this on load
+updateNotificationUI();
 
+// --- Google Sign-In Handler (Global) ---
+    window.signInWithGoogle = function(response) {
+    // If response is present, it's from the new GSI library (ID Token)
     if (response && response.credential) {
         const credential = firebase.auth.GoogleAuthProvider.credential(response.credential);
-        firebase.auth().signInWithCredential(credential).then(() => location.reload());
+        firebase.auth().signInWithCredential(credential)
+            .then((result) => {
+                handleUserPostLogin(result.user);
+            }).catch((error) => {
+                console.error("GSI Error:", error);
+                window.showToast("خطأ في تسجيل الدخول: " + error.message, "error");
+            });
     } else {
+        // Fallback for direct calls (if any) or old popup method
         const provider = new firebase.auth.GoogleAuthProvider();
-        firebase.auth().signInWithPopup(provider).then(() => location.reload());
+        firebase.auth().signInWithPopup(provider)
+            .then((result) => {
+                handleUserPostLogin(result.user);
+            }).catch((error) => {
+                console.error("Popup Error:", error);
+                window.showToast("خطأ في تسجيل الدخول: " + error.message, "error");
+            });
     }
-};
+    };
 
-window.handleUserPostLogin = function(user) {
-    const db = firebase.database();
-    db.goOnline("Post Login Check");
-    db.ref('users/' + user.uid).once('value').then(snap => {
-        db.goOffline("Post Login Done", 1000);
-        if (!snap.exists()) window.showPage('completeProfilePage');
+    window.handleUserPostLogin = function(user) {
+    firebase.database().ref('users/' + user.uid).once('value').then(snap => {
+        if (!snap.exists()) {
+            window.showPage('completeProfilePage');
+        }
     });
-};
+    };
+
