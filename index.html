@@ -794,7 +794,48 @@
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js"></script>
+    <link rel="stylesheet" href="holy-week-styles.css">
     <script src="script.js?v=2.7"></script>
+    <script src="holy-week-app.js"></script>
+    <script>
+        window.showHolyWeekResultModal = function(data, isCorrect) {
+            const modal = document.createElement('div');
+            modal.id = 'holyWeekResultModal';
+            modal.className = 'holy-week-modal-overlay';
+            
+            modal.innerHTML = `
+                <div class="holy-week-modal-content">
+                    <div class="modal-header">
+                        <span class="modal-cross">☦</span>
+                        <h2>${data.dayName}</h2>
+                        <span class="modal-cross">☦</span>
+                    </div>
+                    <div class="modal-scripture">
+                        <p class="scripture-ref">${data.scriptureReference}</p>
+                    </div>
+                    <div class="modal-explanation">
+                        <h3>الشرح اللاهوتي</h3>
+                        <p>${data.theologicalExplanation}</p>
+                    </div>
+                    <div class="modal-spiritual">
+                        <div class="spiritual-icon">✝</div>
+                        <p class="spiritual-message">${data.spiritualMessage}</p>
+                    </div>
+                    <div class="modal-result ${isCorrect ? 'correct' : 'incorrect'}">
+                        ${isCorrect ? '<span class="result-icon">✓</span><span class="result-text">أحسنت! إجابتك صحيحة</span>' : '<span class="result-icon">○</span><span class="result-text">حظاً موفقاً غداً</span>'}
+                    </div>
+                    <button class="modal-close-btn" onclick="closeHolyWeekModal()">تم理解的 - إغلاق</button>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+        };
+        
+        window.closeHolyWeekModal = function() {
+            const modal = document.getElementById('holyWeekResultModal');
+            if (modal) { modal.remove(); }
+        };
+    </script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').then(reg => {
