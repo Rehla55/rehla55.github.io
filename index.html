@@ -434,41 +434,6 @@
             border-color: var(--gold);
             color: var(--gold);
         }
-        .certificate.participant .message {
-            color: #ccc;
-            font-size: 0.95rem;
-            line-height: 1.5;
-            max-width: 260px;
-        }
-
-        .cert-actions {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-            margin-top: 20px;
-            flex-wrap: wrap;
-        }
-        .cert-actions button {
-            padding: 12px 20px;
-            border-radius: 25px;
-            border: none;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 0.9rem;
-        }
-        .download-btn {
-            background: var(--gold);
-            color: #001a33;
-        }
-        .share-insta-btn {
-            background: linear-gradient(45deg, #833ab4, #fd1d1d, #fcb045);
-            color: white;
-        }
-        .close-cert-btn {
-            background: transparent;
-            border: 1px solid #666;
-            color: #aaa;
-        }
 
     </style>
     <meta name="google-site-verification" content="BgkRX0bngBqYQL0DvpLkIkmzf1fS3Zezb77v_7LTEJs" />
@@ -486,7 +451,7 @@
     </script>
         <header>
     <div class="header-content" style="display: flex; direction: ltr; align-items: center; justify-content: space-between; width: 100%;">
-        <div style="display: flex; align-items: center; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
             <div style="width: 46px; height: 46px; border-radius: 50%; background: white; display: flex; align-items: center; justify-content: center; border: 2px solid var(--gold);">
                 <img src="img/icon.jpeg" style="width: 36px; height: 36px; border-radius: 50%;">
             </div>
@@ -782,6 +747,35 @@
             <button onclick="goToHome()">🔙 العودة للرئيسية</button>
         </div>
     </div>
+    <div id="profilePage" class="page">
+        <div class="card">
+            <h2 style="color:var(--gold);">👤 الملف الشخصي</h2>
+            <div style="margin: 20px 0;">
+                <img id="profileAvatar" src="img/icon.jpeg" style="width: 80px; height: 80px; border-radius: 50%; border: 3px solid var(--gold);">
+            </div>
+            <div style="text-align: right; margin: 20px 0;">
+                <p style="color: #aaa; font-size: 0.9rem;">الاسم</p>
+                <p id="profileName" style="color: var(--gold); font-size: 1.3rem; font-weight: bold; margin: 5px 0;">جاري التحميل...</p>
+            </div>
+            <div style="text-align: right; margin: 20px 0;">
+                <p style="color: #aaa; font-size: 0.9rem;">البريد الإلكتروني</p>
+                <p id="profileEmail" style="color: white; font-size: 1rem; margin: 5px 0;">جاري التحميل...</p>
+            </div>
+            <div style="text-align: right; margin: 20px 0;">
+                <p style="color: #aaa; font-size: 0.9rem;">النقاط</p>
+                <p id="profileScore" style="color: var(--gold); font-size: 1.5rem; font-weight: bold; margin: 5px 0;">0</p>
+            </div>
+            <div style="text-align: right; margin: 20px 0;">
+                <p style="color: #aaa; font-size: 0.9rem;">التقدم في الرحلة (55 يوم)</p>
+                <div style="background: rgba(0,0,0,0.3); border-radius: 15px; height: 25px; overflow: hidden; margin: 10px 0;">
+                    <div id="profileProgressBar" style="background: linear-gradient(90deg, var(--gold), #f1c40f); height: 100%; width: 0%; transition: width 1s ease; border-radius: 15px;"></div>
+                </div>
+                <p id="profileDaysText" style="color: white; font-size: 0.95rem; margin: 5px 0;">0 / 55 يوم</p>
+            </div>
+            <button onclick="goToHome()" style="background: rgba(255,255,255,0.1); color: white; border: 1px solid var(--gold);">🔙 العودة للرئيسية</button>
+            <button onclick="logout()" style="background: transparent; color: #ff4444; border: 1px solid #ff4444; margin-top: 10px;">🚪 تسجيل الخروج</button>
+        </div>
+    </div>
     <div id="leaderboardSection" class="leaderboard-card">
         <div class="card">
             <h2 style="text-align: center; font-size: xx-large;">قائمة الأبطال 🏆</h2>
@@ -791,6 +785,11 @@
         </div>
     </div>
     <img src="img/SiteImage.png" style="margin-top: 20px; max-width: 100%;">
+    <div style="text-align: center; margin-top: 20px; padding: 15px;">
+        <a href="mailto:rehla55day@gmail.com?subject=اقتراح أو شكوى" style="background: var(--gold); color: #001a33; font-size: 1.3rem; text-decoration: none; font-weight: bold; padding: 18px 40px; border-radius: 50px; display: inline-block; box-shadow: 0 0 20px rgba(212, 175, 55, 0.5);">
+            ✉️ للمقترحات أو الشكاوى - تواصل معنا
+        </a>
+    </div>
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
@@ -846,9 +845,5 @@
     </script>
 
 </body>
-<footer>
-    <a href="#" onclick="overlayIn(); return false;">سياسة الاستخدام</a> | 📧 للدعم الفني: <a
-        href="mailto:rehla55day@gmail.com">rehla55day@gmail.com</a>
-</footer>
 </html>
 
